@@ -1,6 +1,6 @@
 library(shiny)
 
-shinyUI(fluidPage(
+shinyUI(fluidPage(theme = "minimal.css",
   h2('Interactive Yield and Hazard Calculator', align='center'),
   fluidRow(
     column(9,
@@ -16,10 +16,11 @@ shinyUI(fluidPage(
     column(8, 
       h3('To Do:'),
       p('1. Calculate forward rates.'),
-      p('2. Calculate yield to maturity and spread vs. zero curve.'),
+      p('2. Calculate yield to maturity and -spread.'),
       p('3. Calculate discounted cashflows (traditional method).'),
       p('4. Calculate constant hazard rate.'),
-      p('5. Calculate discounted cashflows (hazard method).')
+      p('5. Calculate discounted cashflows (hazard method).'),
+      textOutput('ytm')
     ),
     column(4,
       plotOutput('risk_free', click = 'plot_click')
