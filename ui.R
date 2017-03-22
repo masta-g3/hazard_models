@@ -7,7 +7,7 @@ shinyUI(fluidPage(theme = "minimal.css",
       plotOutput('cash_flows')),
     column(3,
       numericInput('price', 'Price:', 100, min=0.1),
-      sliderInput('maturity', 'Time to Maturity:', 5, min=0.5, max=30),
+      sliderInput('maturity', 'Time to Maturity:', 10, min=0, max=30),
       sliderInput('coupon', 'Coupon:', 5, min=0, max=20),
       sliderInput('recovery', 'Recovery Rate:', 0.4, min=0, max=1)
     )
@@ -15,9 +15,9 @@ shinyUI(fluidPage(theme = "minimal.css",
   fluidRow(
     column(8, 
       h3('To Do:'),
-      p('1. Calculate forward rates.'),
-      p('2. Calculate yield to maturity and -spread.'),
-      p('3. Calculate discounted cashflows (traditional method).'),
+      div(HTML('<p><strike>1. Calculate forward rates.</strike></p>')),
+      p('2. Calculate yield to maturity and spread.'),
+      div(HTML('<p><strike>3. Calculate discounted cashflows (traditional method).</strike></p>')),
       p('4. Calculate constant hazard rate.'),
       p('5. Calculate discounted cashflows (hazard method).'),
       textOutput('ytm')
