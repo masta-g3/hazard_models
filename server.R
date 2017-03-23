@@ -6,8 +6,10 @@ library(Quandl)
 round_ <- function(x,l) round(x/l)*(l)
 
 ## Retrieve current spot rates.
-zero_rates = Quandl("FED/SVENY", start_date="2017-03-10", end_date="2017-03-10")[-1]
-names(zero_rates) = as.numeric(substr(names(zero_rates),6,7))
+#zero_rates = Quandl("FED/SVENY", start_date="2017-03-10", end_date="2017-03-10")[-1]
+#names(zero_rates) = as.numeric(substr(names(zero_rates),6,7))
+zero_rates <- read.csv('zero_rates.csv')
+names(zero_rates) <- as.numeric(gsub('X', '', names(zero_rates)))
 all_rates <- data.frame(tenor=names(zero_rates), zero=t(zero_rates), row.names=NULL, stringsAsFactors = F)
 all_rates$tenor <- as.numeric(all_rates$tenor)
 
@@ -15,11 +17,7 @@ all_rates$tenor <- as.numeric(all_rates$tenor)
 all_rates$disc <- 1/((1+(all_rates$zero/100)) ** all_rates$tenor)
 all_rates$fwd <- ((all_rates$disc)/lead(all_rates$disc) - 1)*100
 
-## Fake data.
-#tenors = seq(0.5, 30, 0.5)
-#risk_free = c(seq(3,5, 0.1),seq(5.1,7,0.05))
-#df <- data.frame(tenors, risk_free)
-
+## SHINY!!!
 shinyServer(function(input, output) {
   v <- reactiveValues(df=all_rates,
                            click_x = NULL,
@@ -32,15 +30,41 @@ shinyServer(function(input, output) {
     c(rep(v$coupon, v$maturity-1), 100 + v$coupon)
   })
   disc_flows <- reactive({
-    cash_flows() * v$df$disc[length(cash_flows())]
+    cash_flows() * v$df$disc[1:length(cash_flows())]
   })
   ## All flows.
   all_flows <- reactive({
     data.frame(cash_flows=cash_flows(), disc_flows=disc_flows())
   })
   
+  ## YTM.
   ytm <- reactive({
-    (100 / input$price)**(input$maturity*2) - 1 
+    f.ytm<-function(ytm) {
+      sum(cash_flows() / (1+ytm) ** seq(length(cash_flows()))) - input$price
+    }
+    uniroot(f.ytm, interval=c(0,25))$root * 100
+  })
+  
+  ## Spread.
+  spread <- reactive({
+    f.spread <- function(s) {
+      sum(cash_flows() / ((1 + v$df$zero[1:length(cash_flows())]/100 + s) ** seq(length(cash_flows())))) - input$price
+    }
+    uniroot(f.spread, interval=c(0,25))$root * 100
+  })
+
+  ## Hazard Rate.  
+  spread <- reactive({
+    f.spread <- function(s) {
+      sum(cash_flows() / ((1 + v$df$zero[1:length(cash_flows())]/100 + s) ** seq(length(cash_flows())))) - input$price
+    }
+    uniroot(f.spread, interval=c(0,25))$root * 100
+  })
+  
+  
+  ## Spread curve.
+  zspread <- reactive({
+    v$df$zero + spread()
   })
   
   ## Observe coupon.
@@ -73,10 +97,15 @@ shinyServer(function(input, output) {
   
   ## Plot yield curve.
   output$risk_free <- renderPlot({
-    with(v$df, plot(tenor, zero, ylim=c(0, 10), xlab='TTM', ylab='Yield (%)', pch=20, col='#428bca'))
-    with(v$df, lines(tenor, zero, pch=16, col='#428bca'))
-    with(v$df, lines(tenor, fwd, pch=14, col='#999999'))
+    with(v$df, plot(tenor, zero, ylim=c(0, 10), xlab='Maturity (Y)', ylab='Yield (%)', pch=20, col='#000000'))
+    with(v$df, lines(tenor, zero, pch=16, col='#000000'))
+    with(v$df, lines(tenor, fwd, lty=2, col='#999999'))
+    with(v$df, lines(tenor, zspread(), col='#428bca'))
+    with(v$df, points(tenor, zspread(), pch=20, col='#428bca'))
+    abline(h=ytm(), untf=FALSE, col='#a00000', lty="dotted")
+    points(length(cash_flows()), ytm(), pch=20, col='#a00000')
     title('USD Govt Zero Coupon')
+    legend(22, 10, c('YTM', 'Fwd Rates', 'Zero Rates'), lty=c(3,2,1), col=c('#a00000', '#999999', '#428bca'))
   })
   
   ## Plot cash flows.
@@ -87,5 +116,6 @@ shinyServer(function(input, output) {
   ## Output vars.
   output$ytm <- renderText({
     paste0('YTM=', ytm())
+    paste0('SPD=', spread())
   })
 })
