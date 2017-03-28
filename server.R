@@ -23,14 +23,16 @@ shinyServer(function(input, output) {
                            click_x = NULL,
                            click_y = NULL,
                            maturity = 10,
-                           coupon = 5)
+                           coupon = 5,
+                           recovery = 0.4,
+                           price = 80)
   
   ## Bond properties.
   cash_flows <- reactive({
     c(rep(v$coupon, v$maturity-1), 100 + v$coupon)
   })
   disc_flows <- reactive({
-    cash_flows() * v$df$disc[1:length(cash_flows())]
+    cash_flows() * v$df$disc[1:v$maturity]
   })
   ## All flows.
   all_flows <- reactive({
@@ -40,7 +42,7 @@ shinyServer(function(input, output) {
   ## YTM.
   ytm <- reactive({
     f.ytm<-function(ytm) {
-      sum(cash_flows() / (1+ytm) ** seq(length(cash_flows()))) - input$price
+      sum(cash_flows() / (1+ytm) ** seq(v$maturity)) - input$price
     }
     uniroot(f.ytm, interval=c(0,25))$root * 100
   })
@@ -48,17 +50,22 @@ shinyServer(function(input, output) {
   ## Spread.
   spread <- reactive({
     f.spread <- function(s) {
-      sum(cash_flows() / ((1 + v$df$zero[1:length(cash_flows())]/100 + s) ** seq(length(cash_flows())))) - input$price
+      sum(cash_flows() / ((1 + v$df$zero[1:v$maturity]/100 + s) ** seq(v$maturity))) - input$price
     }
     uniroot(f.spread, interval=c(0,25))$root * 100
   })
 
   ## Hazard Rate.  
-  spread <- reactive({
-    f.spread <- function(s) {
-      sum(cash_flows() / ((1 + v$df$zero[1:length(cash_flows())]/100 + s) ** seq(length(cash_flows())))) - input$price
+  hazard <- reactive({
+    f.hazard <- function(l) {
+      abs(v$coupon * sum((rep(1-l, v$maturity)) / (1 + v$df$zero[1:v$maturity]/100) ** seq(v$maturity)) +
+            100 * v$recovery * sum(l * c(1, rep(1-l, v$maturity-1) ** seq(v$maturity-1)) / 
+                                     (1 + v$df$zero[1:v$maturity]/100) ** seq(v$maturity)) +
+            100 * ((1-l) / (1 + v$df$zero[v$maturity]/100)) ** v$maturity -
+            input$price)
     }
-    uniroot(f.spread, interval=c(0,25))$root * 100
+    optim(par=c(), f.hazard)
+    #uniroot(f.hazard, interval=c(0,25))$root * 100
   })
   
   
@@ -71,10 +78,14 @@ shinyServer(function(input, output) {
   observeEvent(input$coupon, {
     v$coupon <- input$coupon
   })
-  ## Observe maturity.
-  observeEvent(input$maturity, {
-    v$maturity <- input$maturity
+  ## Observe v$maturity.
+  observeEvent(input$v$maturity, {
+    v$maturity <- input$v$maturity
   })  
+  ## Observe recovery.
+  observeEvent(input$recovery, {
+    v$recovery <- input$recovery
+  })
   ## Observe yield curve.
   observeEvent(input$plot_click, {
     v$click_x <- round(input$plot_click$x)
@@ -93,29 +104,31 @@ shinyServer(function(input, output) {
     v$df <- tmp_df
     })
   
-  ## Update maturity.
+  ## Update v$maturity.
   
   ## Plot yield curve.
   output$risk_free <- renderPlot({
-    with(v$df, plot(tenor, zero, ylim=c(0, 10), xlab='Maturity (Y)', ylab='Yield (%)', pch=20, col='#000000'))
+    with(v$df, plot(tenor, zero, ylim=c(0, 10), xlab='v$maturity (Y)', ylab='Yield (%)', pch=20, col='#000000'))
     with(v$df, lines(tenor, zero, pch=16, col='#000000'))
-    with(v$df, lines(tenor, fwd, lty=2, col='#999999'))
+    with(v$df, lines(tenor, fwd, lty=2, col='#b0b0b0'))
     with(v$df, lines(tenor, zspread(), col='#428bca'))
     with(v$df, points(tenor, zspread(), pch=20, col='#428bca'))
     abline(h=ytm(), untf=FALSE, col='#a00000', lty="dotted")
     points(length(cash_flows()), ytm(), pch=20, col='#a00000')
     title('USD Govt Zero Coupon')
-    legend(22, 10, c('YTM', 'Fwd Rates', 'Zero Rates'), lty=c(3,2,1), col=c('#a00000', '#999999', '#428bca'))
+    legend(22, 10, c('YTM', 'Fwd Rates', 'Z-Spread', 'Risk Free'),lty=c(3,2,1,1),
+           col=c('#a00000', '#b0b0b0', '#428bca', '#000000'))
   })
   
   ## Plot cash flows.
   output$cash_flows <- renderPlot({
-    barplot(t(as.matrix(all_flows())), names.arg=seq(v$maturity), beside=T, cols=c('#0a0','#000000'))
+    barplot(t(as.matrix(all_flows())), names.arg=seq(v$maturity), beside=T, col=c('#428bca','#000000'))
   })
   
   ## Output vars.
   output$ytm <- renderText({
     paste0('YTM=', ytm())
     paste0('SPD=', spread())
+    paste0('HZD=', hazard())
   })
 })
