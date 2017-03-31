@@ -8,7 +8,7 @@ border-color: #333333;
 }
 
 .js-irs-0 .irs-single, .js-irs-0 .irs-bar-edge, .js-irs-0 .irs-bar {
-background: #a00;
+background: #000000;
 }
 
 .js-irs-1 .irs-bar {
@@ -21,7 +21,7 @@ border-color: #333333;
 }
 
 .js-irs-1 .irs-single, .js-irs-1 .irs-bar-edge, .js-irs-1 .irs-bar {
-background: #428bca;
+background: #a00;
 }
 
 .js-irs-2 .irs-bar {
@@ -34,5 +34,18 @@ border-color: #333333;
 }
 
 .js-irs-2 .irs-single, .js-irs-2 .irs-bar-edge, .js-irs-2 .irs-bar {
+background: #428bca;
+}
+
+.js-irs-3 .irs-bar {
+border-top-color: #333333;
+border-bottom-color: #333333;
+}
+
+.js-irs-3 .irs-bar-edge {
+border-color: #333333;
+}
+
+.js-irs-3 .irs-single, .js-irs-3 .irs-bar-edge, .js-irs-3 .irs-bar {
 background: #0a0;
 }

@@ -22,10 +22,11 @@ shinyServer(function(input, output) {
   v <- reactiveValues(df=all_rates,
                            click_x = NULL,
                            click_y = NULL,
-                           maturity = 10,
+                           maturity = 16,
                            coupon = 5,
                            recovery = 0.4,
-                           price = 80)
+                           price = 90,
+                           hazard=0.08)
   
   ## Bond properties.
   cash_flows <- reactive({
@@ -34,11 +35,11 @@ shinyServer(function(input, output) {
   disc_flows <- reactive({
     cash_flows() * v$df$disc[1:v$maturity]
   })
+  
   ## All flows.
   all_flows <- reactive({
     data.frame(cash_flows=cash_flows(), disc_flows=disc_flows())
   })
-  
   ## YTM.
   ytm <- reactive({
     f.ytm<-function(ytm) {
@@ -46,7 +47,6 @@ shinyServer(function(input, output) {
     }
     uniroot(f.ytm, interval=c(0,25))$root * 100
   })
-  
   ## Spread.
   spread <- reactive({
     f.spread <- function(s) {
@@ -54,7 +54,6 @@ shinyServer(function(input, output) {
     }
     uniroot(f.spread, interval=c(0,25))$root * 100
   })
-
   ## Hazard Rate.  
   hazard <- reactive({
     f.hazard <- function(l) {
@@ -64,11 +63,17 @@ shinyServer(function(input, output) {
             100 * ((1-l) / (1 + v$df$zero[v$maturity]/100)) ** v$maturity -
             input$price)
     }
-    optim(par=c(), f.hazard)
-    #uniroot(f.hazard, interval=c(0,25))$root * 100
+    res = optim(par=c(1), fn=f.hazard)
+    res
   })
-  
-  
+  ## Update hazard variable.
+  observeEvent(hazard(), {
+    v$hazard <- hazard()$par
+  })
+  ## Survival probabilities.
+  survival <- reactive({
+    1/cumprod(rep(1 + v$hazard, v$maturity))
+  })
   ## Spread curve.
   zspread <- reactive({
     v$df$zero + spread()
@@ -79,8 +84,8 @@ shinyServer(function(input, output) {
     v$coupon <- input$coupon
   })
   ## Observe v$maturity.
-  observeEvent(input$v$maturity, {
-    v$maturity <- input$v$maturity
+  observeEvent(input$maturity, {
+    v$maturity <- input$maturity
   })  
   ## Observe recovery.
   observeEvent(input$recovery, {
@@ -104,11 +109,9 @@ shinyServer(function(input, output) {
     v$df <- tmp_df
     })
   
-  ## Update v$maturity.
-  
   ## Plot yield curve.
   output$risk_free <- renderPlot({
-    with(v$df, plot(tenor, zero, ylim=c(0, 10), xlab='v$maturity (Y)', ylab='Yield (%)', pch=20, col='#000000'))
+    with(v$df, plot(tenor, zero, ylim=c(0, 10), xlab='Maturity', ylab='Yield (%)', pch=20, col='#000000'))
     with(v$df, lines(tenor, zero, pch=16, col='#000000'))
     with(v$df, lines(tenor, fwd, lty=2, col='#b0b0b0'))
     with(v$df, lines(tenor, zspread(), col='#428bca'))
@@ -125,10 +128,16 @@ shinyServer(function(input, output) {
     barplot(t(as.matrix(all_flows())), names.arg=seq(v$maturity), beside=T, col=c('#428bca','#000000'))
   })
   
+  ## Plot survival probabilities.
+  output$survival <- renderPlot({
+    plot(seq(v$maturity), 1-survival(), ylim=c(0, 1), xlab='Maturity', ylab='Default (%)', pch=20, col='#a00000')
+    lines(seq(v$maturity), 1-survival(), col='#a00000')
+    abline(h=v$hazard, untf=FALSE, col='#a00000', lty="dotted")
+  })
+  
   ## Output vars.
   output$ytm <- renderText({
-    paste0('YTM=', ytm())
-    paste0('SPD=', spread())
-    paste0('HZD=', hazard())
+    paste0()
+    paste0('SPD=', round(spread(),2), ', ', 'HZD=', round(hazard()$par,2), ', ', 'Error=', round(hazard()$value,5))
   })
 })
