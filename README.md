@@ -1,2 +1,4 @@
-## Hazard Model
-Very simple visual overview of hazard rate and constant spread estimation from bond prices.
+## Hazard Models
+This module consists of several exhibitions.
+  1. Shiny app with visualization of basic dinamics of hazard on bonds.
+  2. Exponential splines optimization.
